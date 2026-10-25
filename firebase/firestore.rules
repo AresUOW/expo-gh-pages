@@ -1,0 +1,129 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function exact(data, fields) {
+      return data.keys().hasAll(fields) && data.keys().hasOnly(fields);
+    }
+    function text(value, maximum) {
+      return value is string && value.size() <= maximum && value.matches('[\\s\\S]*[^\\s][\\s\\S]*');
+    }
+    function validId(value) {
+      return value is string && value.matches('[A-Za-z0-9_-]{1,128}');
+    }
+    function status(value) { return value in ['stray', 'needs_help', 'being_cared_for', 'adopted']; }
+    function location(value) {
+      return value is map && exact(value, ['latitude', 'longitude'])
+        && value.latitude is number && value.longitude is number
+        && value.latitude >= -90 && value.latitude <= 90
+        && value.longitude >= -180 && value.longitude <= 180;
+    }
+    // The matching quota write must commit in the same atomic batch.
+    function consumesQuota(kind, id) {
+      let quota = getAfter(/databases/$(database)/documents/users/$(request.auth.uid)/rateLimits/$(kind)).data;
+      return quota.targetId == id && quota.lastCreatedAt == request.time;
+    }
+    function newRecord(data, kind, id) {
+      return signedIn() && validId(id) && data.authorId == request.auth.uid
+        && data.createdAt == request.time && consumesQuota(kind, id);
+    }
+    function validCat(data, id) {
+      return exact(data, ['authorId', 'description', 'status', 'location', 'geohash', 'imagePath', 'createdAt', 'updatedAt'])
+        && text(data.description, 1000) && status(data.status) && location(data.location)
+        && data.geohash is string && data.geohash.matches('[0123456789bcdefghjkmnpqrstuvwxyz]{9}')
+        && data.imagePath == 'cats/' + data.authorId + '/' + id + '/photo'
+        && data.createdAt is timestamp && data.updatedAt is timestamp;
+    }
+    function validSighting(data, id) {
+      return exact(data, ['catId', 'authorId', 'location', 'status', 'note', 'imagePath', 'createdAt'])
+        && validId(data.catId) && location(data.location) && status(data.status)
+        && data.note is string && data.note.size() <= 500
+        && (data.imagePath == null || data.imagePath == 'sightings/' + data.authorId + '/' + id + '/photo');
+    }
+    function validComment(data) {
+      return exact(data, ['catId', 'authorId', 'text', 'createdAt'])
+        && validId(data.catId) && text(data.text, 1000);
+    }
+    function boundedList() { return request.query.limit != null && request.query.limit <= 100; }
+
+    match /users/{uid} {
+      // Public profile fields only. Email and credentials stay in Firebase Auth.
+      allow get: if signedIn();
+      allow list: if false;
+      allow create: if signedIn() && request.auth.uid == uid
+        && exact(request.resource.data, ['displayName', 'createdAt', 'updatedAt'])
+        && text(request.resource.data.displayName, 50)
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time;
+      allow update: if signedIn() && request.auth.uid == uid
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'updatedAt'])
+        && text(request.resource.data.displayName, 50)
+        && request.resource.data.updatedAt == request.time;
+      allow delete: if false;
+
+      match /rateLimits/{kind} {
+        function validQuota() {
+          let data = request.resource.data;
+          let target = /databases/$(database)/documents/$(kind)/$(data.targetId);
+          return kind in ['cats', 'sightings', 'comments']
+            && exact(data, ['targetId', 'lastCreatedAt']) && validId(data.targetId)
+            && data.lastCreatedAt == request.time
+            // A quota cannot be reset alone or reused for an existing record.
+            && !exists(target) && getAfter(target).data.authorId == uid
+            && getAfter(target).data.createdAt == request.time;
+        }
+        function cooldown() { return kind == 'comments' ? 10 : 60; }
+        allow get: if signedIn() && request.auth.uid == uid;
+        allow list, delete: if false;
+        allow create: if signedIn() && request.auth.uid == uid && validQuota();
+        allow update: if signedIn() && request.auth.uid == uid && validQuota()
+          && request.time >= resource.data.lastCreatedAt + duration.value(cooldown(), 's');
+      }
+    }
+
+    match /cats/{catId} {
+      allow get: if signedIn();
+      allow list: if signedIn() && boundedList();
+      allow create: if newRecord(request.resource.data, 'cats', catId)
+        && validCat(request.resource.data, catId) && request.resource.data.updatedAt == request.time;
+      allow update: if signedIn() && validCat(request.resource.data, catId)
+        && request.resource.data.updatedAt == request.time
+        && (
+          (resource.data.authorId == request.auth.uid
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['description', 'updatedAt']))
+          || (
+            request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt'])
+            && linkedSighting(catId, request.resource.data.status)
+          )
+        );
+      // Avoid orphaning comments, sightings, and photos; trusted cleanup only.
+      allow delete: if false;
+    }
+    function linkedSighting(catId, newStatus) {
+      let quota = getAfter(/databases/$(database)/documents/users/$(request.auth.uid)/rateLimits/sightings).data;
+      let sighting = getAfter(/databases/$(database)/documents/sightings/$(quota.targetId)).data;
+      return quota.lastCreatedAt == request.time && sighting.createdAt == request.time
+        && sighting.authorId == request.auth.uid && sighting.catId == catId && sighting.status == newStatus;
+    }
+    match /sightings/{sightingId} {
+      allow get: if signedIn();
+      allow list: if signedIn() && boundedList();
+      allow create: if newRecord(request.resource.data, 'sightings', sightingId)
+        && validSighting(request.resource.data, sightingId)
+        && exists(/databases/$(database)/documents/cats/$(request.resource.data.catId))
+        && getAfter(/databases/$(database)/documents/cats/$(request.resource.data.catId)).data.status == request.resource.data.status
+        && getAfter(/databases/$(database)/documents/cats/$(request.resource.data.catId)).data.updatedAt == request.time;
+      allow update, delete: if false;
+    }
+    match /comments/{commentId} {
+      allow get: if signedIn();
+      allow list: if signedIn() && boundedList();
+      allow create: if newRecord(request.resource.data, 'comments', commentId)
+        && validComment(request.resource.data)
+        && exists(/databases/$(database)/documents/cats/$(request.resource.data.catId));
+      allow update: if false;
+      allow delete: if signedIn() && resource.data.authorId == request.auth.uid;
+    }
+    match /{document=**} { allow read, write: if false; }
+  }
+}

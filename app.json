@@ -1,0 +1,16 @@
+{
+  "expo": {
+    "name": "KitoKato", "slug": "kitokato", "scheme": "kitokato", "version": "0.1.0",
+    "orientation": "portrait", "userInterfaceStyle": "light",
+    "ios": { "supportsTablet": true, "bundleIdentifier": "app.kitokato.mobile" },
+    "android": { "package": "app.kitokato.mobile" },
+    "web": { "bundler": "metro", "name": "KitoKato — Meet your neighborhood cats" },
+    "plugins": [
+      ["expo-image-picker", { "photosPermission": "Choose a photo to help neighbors recognize this cat.", "cameraPermission": false, "microphonePermission": false }],
+      ["expo-location", { "locationWhenInUsePermission": "Find nearby cats and record where you spotted one." }]
+    ],
+    "experiments": {
+      "baseUrl": "/expo-gh-pages"
+  }
+}
+}

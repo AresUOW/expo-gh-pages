@@ -1,0 +1,28 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /cats/{uid}/{catId}/photo {
+      function cat() { return firestore.get(/databases/(default)/documents/cats/$(catId)).data; }
+      allow read: if request.auth != null && cat().authorId == uid;
+      // One immutable image per rate-limited cat, with a bounded upload window.
+      allow create: if resource == null && request.auth != null && request.auth.uid == uid
+        && cat().authorId == uid && cat().imagePath == 'cats/' + uid + '/' + catId + '/photo'
+        && request.time <= cat().createdAt + duration.value(10, 'm')
+        && request.resource.size > 0 && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
+      allow update, delete: if false;
+    }
+    match /sightings/{uid}/{sightingId}/photo {
+      function sighting() { return firestore.get(/databases/(default)/documents/sightings/$(sightingId)).data; }
+      allow read: if request.auth != null && sighting().authorId == uid;
+      allow create: if resource == null && request.auth != null && request.auth.uid == uid
+        && sighting().authorId == uid
+        && sighting().imagePath == 'sightings/' + uid + '/' + sightingId + '/photo'
+        && request.time <= sighting().createdAt + duration.value(10, 'm')
+        && request.resource.size > 0 && request.resource.size <= 5 * 1024 * 1024
+        && request.resource.contentType in ['image/jpeg', 'image/png', 'image/webp'];
+      allow update, delete: if false;
+    }
+    match /{path=**} { allow read, write: if false; }
+  }
+}

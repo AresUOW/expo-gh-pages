@@ -1,0 +1,25 @@
+{
+  "indexes": [
+    { "collectionGroup": "cats", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "status", "order": "ASCENDING" },
+      { "fieldPath": "geohash", "order": "ASCENDING" }
+    ] },
+    { "collectionGroup": "comments", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "catId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ] },
+    { "collectionGroup": "sightings", "queryScope": "COLLECTION", "fields": [
+      { "fieldPath": "catId", "order": "ASCENDING" },
+      { "fieldPath": "createdAt", "order": "DESCENDING" }
+    ] }
+  ],
+  "fieldOverrides": [
+    { "collectionGroup": "cats", "fieldPath": "description", "indexes": [] },
+    { "collectionGroup": "cats", "fieldPath": "imagePath", "indexes": [] },
+    { "collectionGroup": "cats", "fieldPath": "location", "indexes": [] },
+    { "collectionGroup": "comments", "fieldPath": "text", "indexes": [] },
+    { "collectionGroup": "sightings", "fieldPath": "note", "indexes": [] },
+    { "collectionGroup": "sightings", "fieldPath": "imagePath", "indexes": [] },
+    { "collectionGroup": "sightings", "fieldPath": "location", "indexes": [] }
+  ]
+}

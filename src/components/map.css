@@ -1,0 +1,16 @@
+.leaflet-container { font-family: DMSans_400Regular, sans-serif; background: #e9ede2; z-index: 0; }
+.leaflet-tile-pane { filter: saturate(.45) contrast(.88) brightness(1.07); }
+.leaflet-control-attribution { font-size: 9px !important; background: rgba(255,255,255,.85) !important; }
+.leaflet-control-attribution a { color: #667363; }
+.leaflet-control-zoom { border: 1px solid #e0e3d9 !important; border-radius: 12px !important; overflow: hidden; box-shadow: 0 3px 15px #2630250e !important; margin-right: 20px !important; margin-bottom: 48px !important; }
+.leaflet-control-zoom a { color: #53634d !important; width: 36px !important; height: 36px !important; line-height: 36px !important; font-weight: normal !important; }
+.cat-map-marker { background: transparent; border: 0; }
+.cat-pin { display: flex; flex-direction: column; align-items: center; width: 80px; cursor: pointer; transition: transform .15s ease; }
+.cat-pin:hover { transform: translateY(-4px); }
+.cat-pin-face { position: relative; width: 52px; height: 52px; box-sizing: border-box; border: 3px solid white; border-radius: 50%; background: #e2d5bc; box-shadow: 0 3px 12px #26302524; }
+.leaflet-container .cat-pin-face img { width: 100% !important; height: 100% !important; border-radius: 50%; object-fit: cover; }
+.cat-pin-face.no-photo::before { content: '🐾'; display: grid; height: 100%; place-items: center; font-size: 23px; }
+.cat-pin-dot { position: absolute; bottom: -1px; right: -2px; width: 12px; height: 12px; border: 2px solid white; border-radius: 50%; }
+.cat-pin.selected .cat-pin-face { border-color: #e8724a; }
+.cat-pin-label { margin-top: 6px; background: white; padding: 3px 9px; max-width: 130px; white-space: nowrap; border-radius: 7px; color: #344130; font-size: 11px; font-family: DMSans_600SemiBold, sans-serif; box-shadow: 0 2px 8px #2630250c; }
+.cat-pin.selected .cat-pin-label { background: #e8724a; color: white; }
